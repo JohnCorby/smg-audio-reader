@@ -9,7 +9,7 @@ pub struct AstFile {
 #[derive(Deserialize, Debug)]
 pub struct AstHeader {
     /// "STRM" (0x5354524D)
-    __identifier: [u8; 4],
+    __identifier: u32,
     /// Size of all the BLCK chunks (size of the file minus 64)
     pub total_block_size: u32,
     /// Unknown (0x00010010)
@@ -32,20 +32,42 @@ pub struct AstHeader {
     __unknown4: [u8; 28],
 }
 
-
 #[derive(Debug)]
 pub struct BlockChunk {
     pub header: BlockChunkHeader,
+    pub num_channels: u16,
     /// PCM16 data blocks
-    pub data_blocks: Vec<Vec<u8>>,
+    pub pcm_blocks: Vec<PcmBlock>,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct BlockChunkHeader {
     /// "BLCK" (0x424C434B)
-    __identifier: [u8; 4],
+    __identifier: u32,
     /// Block size (typically 0x2760)
     pub block_size: u32,
     /// Padding (zero)
     __padding: [u8; 24],
 }
+
+#[derive(Debug)]
+pub struct PcmBlock(pub Vec<u8>);
+
+// mod fmt {
+//     use std::fmt::{Debug, Error, Formatter, Result};
+//     use std::str::{from_utf8, from_utf8_unchecked};
+//
+//     use crate::structs::PcmBlock;
+//
+//     fn bytes_to_str(bytes: &[u8]) -> std::result::Result<&str, Error> {
+//         from_utf8(bytes).map_err(|_| Error)
+//     }
+//
+//     impl Debug for PcmBlock {
+//         fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+//             // let str = bytes_to_str(&self.0)?;
+//             let str = from_utf8_unchecked(&self.0).expect("error converting chars to str");
+//             f.write_str(str)
+//         }
+//     }
+// }
