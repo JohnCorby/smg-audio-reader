@@ -1,20 +1,21 @@
 use std::fs::File;
+
+use crate::parse::Parsable;
+use crate::structs::{AstFile, check_structs};
 use std::io::Read;
 
-use bincode::deserialize;
-use serde::Deserialize;
+mod structs;
+mod parse;
+
+const PATH: &str = "data/AudioRes/Stream/SMG_boss01a_strm.ast";
 
 fn main() {
-    const PATH: &str = "data/AudioRes/Stream/SMG_astrodome02_strm.ast";
+    check_structs();
 
     let mut file = File::open(PATH).expect("error opening file");
-    let mut encoded = Vec::new();
-    file.read_to_end(&mut encoded).expect("error reading file");
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes).expect("error reading file");
 
-    let decoded: ASTFile = deserialize(&encoded).expect("error deserializing file");
+    let decoded: AstFile = AstFile::from_bytes(&bytes);
     println!("{:#?}", decoded)
 }
-
-
-#[derive(Deserialize, Debug)]
-struct ASTFile {}

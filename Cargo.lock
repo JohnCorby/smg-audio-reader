@@ -55,7 +55,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "smg_audio_reader"
+name = "smg-audio-reader"
 version = "0.1.0"
 dependencies = [
  "bincode",
