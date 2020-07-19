@@ -1,19 +1,15 @@
 use std::fs::File;
-use std::io::{Error, Read};
+use std::io::Read;
 use std::mem::size_of;
 
 use bincode::{options, Options};
+use byteorder::{BigEndian, ReadBytesExt};
 use serde::Deserialize;
 
-use crate::structs::{AstFile, AstHeader, BlockChunk, BlockChunkHeader, PcmBlock};
-
-/// something that can be parsed from a file
-pub trait Parsable {
-    /// construct from a file
-    fn parse(file: &mut File) -> Result<Self, Error>
-    where
-        Self: Sized;
-}
+use crate::structs::{
+    AstFile, AstHeader, Block, BlockChunk, BlockChunkHeader, AST_MAGIC, AUDIO_FORMAT_PCM16,
+    BLOCK_CHUNK_MAGIC,
+};
 
 /// deserialize but with our own options
 fn deserialize<'a, T: Deserialize<'a>>(bytes: &'a [u8]) -> T {
@@ -25,66 +21,72 @@ fn deserialize<'a, T: Deserialize<'a>>(bytes: &'a [u8]) -> T {
         .expect("error deserializing bytes")
 }
 
-/// implements `from_file` for the given deserializable struct
-macro_rules! impl_deserialize_parse {
-    ($struct_name:ident) => {
-        impl Parsable for $struct_name {
-            fn parse(file: &mut File) -> Result<Self, Error> {
-                let mut bytes = [0; size_of::<Self>()]; // allocated on the stack
-                file.read_exact(&mut bytes)?;
-                Ok(deserialize(&bytes))
-            }
-        }
-    };
-}
+impl AstFile {
+    pub fn parse(file: &mut File) -> Self {
+        let header = AstHeader::parse(file);
 
-impl_deserialize_parse!(AstHeader);
-impl_deserialize_parse!(BlockChunkHeader);
+        let mut block_chunks = vec![];
+        // loop {
+        block_chunks.push(BlockChunk::parse(file, &header));
+        // todo break at end
+        // }
 
-impl Parsable for AstFile {
-    fn parse(file: &mut File) -> Result<Self, Error> {
-        Ok(AstFile {
-            header: AstHeader::parse(file)?,
-            block_chunks: {
-                let mut ret = Vec::new();
-                while let Ok(block_chunk) = BlockChunk::parse(file) {
-                    ret.push(block_chunk);
-                }
-                ret
-            },
-        })
-    }
-}
-
-impl Parsable for BlockChunk {
-    fn parse(file: &mut File) -> Result<Self, Error> {
-        let header = BlockChunkHeader::parse(file)?;
-        let num_channels = 4;
-        let pcm_blocks = {
-            let mut ret = Vec::with_capacity(num_channels as usize);
-            for _ in 0..num_channels {
-                ret.push(PcmBlock::parse(file)?)
-            }
-            ret
-        };
-
-        Ok(BlockChunk {
+        AstFile {
             header,
-            num_channels,
-            pcm_blocks,
-        })
+            block_chunks,
+        }
     }
 }
 
-impl Parsable for PcmBlock {
-    fn parse(file: &mut File) -> Result<Self, Error> {
-        let block_size: u32 = 0x2760;
-        let bytes = {
-            let mut bytes = vec![0; block_size as usize];
-            file.read_exact(&mut bytes)?;
-            bytes
-        };
+impl AstHeader {
+    fn parse(file: &mut File) -> Self {
+        let mut bytes = [0; size_of::<Self>()];
+        file.read_exact(&mut bytes)
+            .expect("error reading ast header");
 
-        Ok(PcmBlock(bytes))
+        let ret: AstHeader = deserialize(&bytes);
+        assert_eq!(ret.magic, AST_MAGIC, "wrong ast magic");
+        assert_eq!(ret.audio_format, AUDIO_FORMAT_PCM16, "wrong audio format");
+        assert_eq!(ret.bit_depth, 16, "wrong bit depth");
+        ret
+    }
+}
+
+impl BlockChunk {
+    fn parse(file: &mut File, ast_header: &AstHeader) -> Self {
+        let header = BlockChunkHeader::parse(file);
+
+        let mut blocks = vec![];
+        for _ in 0..ast_header.num_channels {
+            blocks.push(Block::parse(file, &header))
+        }
+
+        BlockChunk { header, blocks }
+    }
+}
+
+impl BlockChunkHeader {
+    fn parse(file: &mut File) -> Self {
+        let mut bytes = [0; size_of::<Self>()];
+        file.read_exact(&mut bytes)
+            .expect("error reading block chunk header");
+
+        let ret: BlockChunkHeader = deserialize(&bytes);
+        assert_eq!(ret.magic, BLOCK_CHUNK_MAGIC, "wrong block chunk magic");
+        ret
+    }
+}
+
+impl Block {
+    fn parse(file: &mut File, header: &BlockChunkHeader) -> Self {
+        let mut samples = Vec::with_capacity(header.block_size as usize);
+        for _ in 0..header.block_size {
+            let sample = file
+                .read_u16::<BigEndian>()
+                .expect("error reading block sample");
+            samples.push(sample)
+        }
+
+        Block(samples)
     }
 }

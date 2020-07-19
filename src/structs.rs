@@ -6,68 +6,41 @@ pub struct AstFile {
     pub block_chunks: Vec<BlockChunk>,
 }
 
+pub const AST_MAGIC: u32 = 0x5354524D;
+
 #[derive(Deserialize, Debug)]
 pub struct AstHeader {
-    /// "STRM" (0x5354524D)
-    __identifier: u32,
-    /// Size of all the BLCK chunks (size of the file minus 64)
+    pub magic: u32,
     pub total_block_size: u32,
-    /// Unknown (0x00010010)
-    __unknown1: u32,
-    /// Number of channels (typically 2 = stereo)
+    pub audio_format: u16,
+    pub bit_depth: u16,
     pub num_channels: u16,
-    /// Unknown (0xFFFF)
-    __unknown2: u16,
-    /// Sampling rate in Hz (typically 32000)
-    pub sampling_rate: u32,
-    /// Total number of samples
-    pub total_num_samples: u32,
-    /// Loopstart position in samples/bytes?
-    pub loop_start_pos: u32,
-    /// Unknown (typically same as entry 0x0014)
-    __unknown3: u32,
-    /// Block size for the first chunk? (typically 0x2760)
+    __unknown1: u16,
+    pub sample_rate: u32,
+    pub num_samples: u32,
+    pub loop_start: u32,
+    pub loop_end: u32,
     pub first_block_size: u32,
-    /// Unknown (Usually all zeros except 0x0028, which is 0x7F)
-    __unknown4: [u8; 28],
+    __unknown2: [u8; 0x1C],
 }
+
+// pub const AUDIO_FORMAT_ADPCM: u16 = 0;
+pub const AUDIO_FORMAT_PCM16: u16 = 1;
+
+pub const BLOCK_CHUNK_MAGIC: u32 = 0x424C434B;
 
 #[derive(Debug)]
 pub struct BlockChunk {
     pub header: BlockChunkHeader,
-    pub num_channels: u16,
-    /// PCM16 data blocks
-    pub pcm_blocks: Vec<PcmBlock>,
+    pub blocks: Vec<Block>,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct BlockChunkHeader {
-    /// "BLCK" (0x424C434B)
-    __identifier: u32,
-    /// Block size (typically 0x2760)
+    pub magic: u32,
     pub block_size: u32,
-    /// Padding (zero)
-    __padding: [u8; 24],
+    __padding: [u8; 0x18],
 }
 
 #[derive(Debug)]
-pub struct PcmBlock(pub Vec<u8>);
-
-// mod fmt {
-//     use std::fmt::{Debug, Error, Formatter, Result};
-//     use std::str::{from_utf8, from_utf8_unchecked};
-//
-//     use crate::structs::PcmBlock;
-//
-//     fn bytes_to_str(bytes: &[u8]) -> std::result::Result<&str, Error> {
-//         from_utf8(bytes).map_err(|_| Error)
-//     }
-//
-//     impl Debug for PcmBlock {
-//         fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-//             // let str = bytes_to_str(&self.0)?;
-//             let str = from_utf8_unchecked(&self.0).expect("error converting chars to str");
-//             f.write_str(str)
-//         }
-//     }
-// }
+pub struct Block(pub Vec<u16>);
