@@ -4,10 +4,13 @@ use std::mem::size_of;
 use std::path::Path;
 use std::time::Instant;
 
+use crate::parse::Parsable;
 use crate::structs::{AstFile, AstHeader, AudioFormat, BlockChunkHeader};
 
 mod parse;
+mod seek_ext;
 mod structs;
+mod verify;
 
 /// see https://wiibrew.org/wiki/AST_file
 /// and http://wiki.tockdom.com/wiki/AST_(File_Format)#BLCK
@@ -32,7 +35,7 @@ fn main() {
     let mut file = File::open(path).expect("error opening file");
 
     let decoded = AstFile::parse(&mut file);
-    // println!("{:X?}", decoded);
+    println!("{:X?}", decoded);
 
     println!("that took {:?}", now.elapsed());
 }

@@ -51,4 +51,7 @@ impl BlockChunkHeader {
 }
 
 #[derive(Debug)]
-pub struct Block(pub Vec<u16>);
+pub struct Block(pub Vec<Sample>);
+
+#[derive(Debug)]
+pub struct Sample(pub u16);
