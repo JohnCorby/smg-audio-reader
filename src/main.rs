@@ -1,12 +1,10 @@
 use std::env::args;
-use std::fs::File;
-use std::mem::size_of;
 use std::path::Path;
 use std::time::Instant;
 
-use crate::parse::Parsable;
-use crate::structs::{AstFile, AstHeader, AudioFormat, BlockChunkHeader};
+use crate::structs::AstFile;
 
+mod into_wav;
 mod parse;
 mod seek_ext;
 mod structs;
@@ -17,25 +15,13 @@ mod verify;
 fn main() {
     let now = Instant::now();
 
-    assert_eq!(size_of::<AstHeader>(), 0x40, "wrong ast header size");
-    assert_eq!(size_of::<AudioFormat>(), 2, "wrong audio format size");
-    assert_eq!(
-        size_of::<BlockChunkHeader>(),
-        0x20,
-        "wrong block chunk header size"
-    );
-
+    println!("reading ast");
     let path = args().nth(1).expect("path not provided");
     let path = Path::new(&path);
-    assert_eq!(
-        path.extension().unwrap_or_default(),
-        "ast",
-        "path must be ast file"
-    );
-    let mut file = File::open(path).expect("error opening file");
+    let ast_file = AstFile::open(&path);
 
-    let decoded = AstFile::parse(&mut file);
-    println!("{:X?}", decoded);
+    println!("writing wav");
+    ast_file.into_wav(&path.with_extension("wav"));
 
-    println!("that took {:?}", now.elapsed());
+    println!("program took {:?}", now.elapsed());
 }

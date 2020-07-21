@@ -1,13 +1,16 @@
 use std::fs::File;
 use std::io::Read;
 use std::mem::size_of;
+use std::path::Path;
 
 use bincode::{options, Options};
-use byteorder::{BigEndian, ReadBytesExt};
+use byteorder::{ReadBytesExt, BE};
 use serde::Deserialize;
 
 use crate::seek_ext::SeekExt;
-use crate::structs::{AstFile, AstHeader, Block, BlockChunk, BlockChunkHeader, Sample};
+use crate::structs::{
+    AstFile, AstHeader, AudioFormat, Block, BlockChunk, BlockChunkHeader, Sample,
+};
 use crate::verify::Verifiable;
 
 fn deserialize<'a, T: Deserialize<'a>>(bytes: &'a [u8]) -> T {
@@ -19,8 +22,29 @@ fn deserialize<'a, T: Deserialize<'a>>(bytes: &'a [u8]) -> T {
         .expect("error deserializing bytes")
 }
 
-pub trait Parsable {
+trait Parsable {
     fn parse(file: &mut File) -> Self;
+}
+
+impl AstFile {
+    pub fn open(path: &Path) -> Self {
+        // fixme make static assertions? maybe the optimizer does this for us
+        assert_eq!(size_of::<AstHeader>(), 0x40, "wrong ast header size");
+        assert_eq!(size_of::<AudioFormat>(), 2, "wrong audio format size");
+        assert_eq!(
+            size_of::<BlockChunkHeader>(),
+            0x20,
+            "wrong block chunk header size"
+        );
+
+        assert_eq!(
+            path.extension().unwrap_or_default(),
+            "ast",
+            "path must be ast file"
+        );
+        let mut file = File::open(path).expect("error opening file");
+        Self::parse(&mut file)
+    }
 }
 
 impl Parsable for AstFile {
@@ -30,10 +54,8 @@ impl Parsable for AstFile {
         let mut block_chunks = vec![];
         while !file.at_eof() {
             block_chunks.push(BlockChunk::parse(file, header.num_channels));
-            // println!("{:X} {:X}", file.pos(), file.len());
         }
 
-        file.print_pos();
         AstFile {
             header,
             block_chunks,
@@ -54,9 +76,8 @@ impl Parsable for AstHeader {
 impl BlockChunk {
     fn parse(file: &mut File, num_channels: u16) -> Self {
         let header = BlockChunkHeader::parse(file);
-
         let blocks = (0..num_channels)
-            .map(|_| Block::parse(file, header.block_size / 2))
+            .map(|_| Block::parse(file, header.num_samples()))
             .collect();
 
         BlockChunk { header, blocks }
@@ -67,7 +88,7 @@ impl Parsable for BlockChunkHeader {
     fn parse(file: &mut File) -> Self {
         let mut bytes = [0; size_of::<Self>()];
         file.read_exact(&mut bytes)
-            .expect("error reading block chunk header");
+            .expect("error reading partial channel chunk header");
 
         deserialize::<BlockChunkHeader>(&bytes).verify()
     }
@@ -75,16 +96,12 @@ impl Parsable for BlockChunkHeader {
 
 impl Block {
     fn parse(file: &mut File, num_samples: u32) -> Self {
-        let samples = (0..num_samples).map(|_| Sample::parse(file)).collect();
-
-        Block(samples)
+        Block((0..num_samples).map(|_| Sample::parse(file)).collect())
     }
 }
 
 impl Parsable for Sample {
     fn parse(file: &mut File) -> Self {
-        let sample = file.read_u16::<BigEndian>().expect("error reading sample");
-
-        Sample(sample)
+        Sample(file.read_i16::<BE>().expect("error reading sample"))
     }
 }
