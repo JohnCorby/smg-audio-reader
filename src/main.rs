@@ -12,6 +12,8 @@ mod verify;
 
 /// see https://wiibrew.org/wiki/AST_file
 /// and http://wiki.tockdom.com/wiki/AST_(File_Format)#BLCK
+/// todo use result instead of panicking
+/// todo pad end with zeroes??? instead of failing when "failed to fill the whole buffer"
 fn main() {
     let now = Instant::now();
 
