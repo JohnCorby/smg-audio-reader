@@ -6,7 +6,7 @@ pub trait Verifiable {
 
 impl Verifiable for AstHeader {
     fn verify(self) -> Self {
-        assert_eq!(self.magic, AstHeader::MAGIC, "wrong ast magic");
+        assert_eq!(&self.magic, AstHeader::MAGIC, "wrong ast magic");
         assert_eq!(
             self.audio_format,
             AudioFormat::PCM16 as u16,
@@ -20,7 +20,7 @@ impl Verifiable for AstHeader {
 impl Verifiable for BlockChunkHeader {
     fn verify(self) -> Self {
         assert_eq!(
-            self.magic,
+            &self.magic,
             BlockChunkHeader::MAGIC,
             "wrong block chunk magic"
         );

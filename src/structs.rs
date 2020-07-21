@@ -23,7 +23,7 @@ pub struct AstHeader {
 }
 
 impl AstHeader {
-    pub const MAGIC: [u8; 4] = *b"STRM";
+    pub const MAGIC: &'static [u8; 4] = b"STRM";
 }
 
 #[derive(Deserialize, Debug)]
@@ -47,7 +47,7 @@ pub struct BlockChunkHeader {
 }
 
 impl BlockChunkHeader {
-    pub const MAGIC: [u8; 4] = *b"BLCK";
+    pub const MAGIC: &'static [u8; 4] = b"BLCK";
 }
 
 #[derive(Debug)]
