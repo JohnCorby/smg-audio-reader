@@ -88,7 +88,7 @@ impl Parsable for BlockChunkHeader {
     fn parse(file: &mut File) -> Self {
         let mut bytes = [0; size_of::<Self>()];
         file.read_exact(&mut bytes)
-            .expect("error reading partial channel chunk header");
+            .expect("error reading block chunk header");
 
         deserialize::<BlockChunkHeader>(&bytes).verify()
     }
