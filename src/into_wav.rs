@@ -23,9 +23,9 @@ impl AstFile {
         // write the samples
         // blocks correspond to parts of channels
         // and wav interleaves channel data
-        for block_chunk in self.block_chunks.iter() {
+        for block_chunk in self.block_chunks {
             for sample_index in 0..block_chunk.header.num_samples() {
-                for block in block_chunk.blocks.iter() {
+                for block in &block_chunk.blocks {
                     writer
                         .write_sample(block.0[sample_index as usize].0)
                         .expect("error writing wav sample");

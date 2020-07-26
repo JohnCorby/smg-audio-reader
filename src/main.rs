@@ -4,9 +4,9 @@ use std::time::Instant;
 
 use crate::structs::AstFile;
 
+mod file_ext;
 mod into_wav;
 mod parse;
-mod seek_ext;
 mod structs;
 mod verify;
 

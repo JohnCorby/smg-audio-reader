@@ -1,13 +1,11 @@
 use std::fs::File;
-use std::io::Read;
 use std::mem::size_of;
 use std::path::Path;
 
 use bincode::{options, Options};
-use byteorder::{ReadBytesExt, BE};
 use serde::Deserialize;
 
-use crate::seek_ext::SeekExt;
+use crate::file_ext::FileExt;
 use crate::structs::{
     AstFile, AstHeader, AudioFormat, Block, BlockChunk, BlockChunkHeader, Sample,
 };
@@ -52,6 +50,7 @@ impl Parsable for AstFile {
         let header = AstHeader::parse(file);
 
         let mut block_chunks = vec![];
+        // fixme use something other than eof because this is expensive i think
         while !file.at_eof() {
             block_chunks.push(BlockChunk::parse(file, header.num_channels));
         }
@@ -66,10 +65,9 @@ impl Parsable for AstFile {
 impl Parsable for AstHeader {
     fn parse(file: &mut File) -> Self {
         let mut bytes = [0; size_of::<Self>()];
-        file.read_exact(&mut bytes)
-            .expect("error reading ast header");
+        file.read_or_pad(&mut bytes);
 
-        deserialize::<AstHeader>(&bytes).verify()
+        deserialize::<Self>(&bytes).verify()
     }
 }
 
@@ -87,10 +85,9 @@ impl BlockChunk {
 impl Parsable for BlockChunkHeader {
     fn parse(file: &mut File) -> Self {
         let mut bytes = [0; size_of::<Self>()];
-        file.read_exact(&mut bytes)
-            .expect("error reading block chunk header");
+        file.read_or_pad(&mut bytes);
 
-        deserialize::<BlockChunkHeader>(&bytes).verify()
+        deserialize::<Self>(&bytes).verify()
     }
 }
 
@@ -102,6 +99,9 @@ impl Block {
 
 impl Parsable for Sample {
     fn parse(file: &mut File) -> Self {
-        Sample(file.read_i16::<BE>().expect("error reading sample"))
+        let mut bytes = [0; size_of::<Self>()];
+        file.read_or_pad(&mut bytes);
+
+        Sample(i16::from_be_bytes(bytes))
     }
 }

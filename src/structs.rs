@@ -6,6 +6,7 @@ pub struct AstFile {
     pub block_chunks: Vec<BlockChunk>,
 }
 
+/// todo deserialize using our own thing and from_be_bytes because i think serde is slow here
 #[derive(Deserialize, Debug)]
 pub struct AstHeader {
     pub magic: [u8; 4],
