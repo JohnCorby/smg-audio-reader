@@ -1,37 +1,25 @@
 use std::fs::File;
+use std::io::{BufReader, Read};
 use std::mem::size_of;
 use std::path::Path;
+use std::time::Instant;
 
-use bincode::{options, Options};
-use serde::Deserialize;
+use crate::ext::FileExt;
+use crate::structs::{AstFile, AstHeader, AudioFormat, Block, BlockChunk, BlockChunkHeader};
 
-use crate::file_ext::FileExt;
-use crate::structs::{
-    AstFile, AstHeader, AudioFormat, Block, BlockChunk, BlockChunkHeader, Sample,
-};
-use crate::verify::Verifiable;
-
-fn deserialize<'a, T: Deserialize<'a>>(bytes: &'a [u8]) -> T {
-    options()
-        .with_big_endian()
-        .with_fixint_encoding()
-        .allow_trailing_bytes()
-        .deserialize(bytes)
-        .expect("error deserializing bytes")
-}
+type Reader = BufReader<File>;
 
 trait Parsable {
-    fn parse(file: &mut File) -> Self;
+    fn parse(file: &mut Reader) -> Self;
 }
 
 impl AstFile {
     pub fn open(path: &Path) -> Self {
-        // fixme make static assertions? maybe the optimizer does this for us
-        assert_eq!(size_of::<AstHeader>(), 0x40, "wrong ast header size");
+        assert_eq!(size_of::<AstHeader>(), 64, "wrong ast header size");
         assert_eq!(size_of::<AudioFormat>(), 2, "wrong audio format size");
         assert_eq!(
             size_of::<BlockChunkHeader>(),
-            0x20,
+            32,
             "wrong block chunk header size"
         );
 
@@ -40,19 +28,23 @@ impl AstFile {
             "ast",
             "path must be ast file"
         );
-        let mut file = File::open(path).expect("error opening file");
-        Self::parse(&mut file)
+
+        let now = Instant::now();
+        let file = Self::parse(&mut BufReader::new(
+            File::open(path).expect("error opening file"),
+        ));
+        println!("parsing {:?} took {:?}", path, now.elapsed());
+        file
     }
 }
 
 impl Parsable for AstFile {
-    fn parse(file: &mut File) -> Self {
-        let header = AstHeader::parse(file);
+    fn parse(reader: &mut Reader) -> Self {
+        let header = AstHeader::parse(reader);
 
         let mut block_chunks = vec![];
-        // fixme use something other than eof because this is expensive i think
-        while !file.at_eof() {
-            block_chunks.push(BlockChunk::parse(file, header.num_channels));
+        while !reader.at_eof() {
+            block_chunks.push(BlockChunk::parse(reader, header.num_channels));
         }
 
         AstFile {
@@ -63,19 +55,26 @@ impl Parsable for AstFile {
 }
 
 impl Parsable for AstHeader {
-    fn parse(file: &mut File) -> Self {
-        let mut bytes = [0; size_of::<Self>()];
-        file.read_or_pad(&mut bytes);
+    fn parse(reader: &mut Reader) -> Self {
+        let header: Self = reader.deserialize(&mut [0; 64]);
 
-        deserialize::<Self>(&bytes).verify()
+        assert_eq!(&header.magic, AstHeader::MAGIC, "wrong ast magic");
+        assert_eq!(
+            header.audio_format,
+            AudioFormat::PCM16 as u16,
+            "wrong audio format"
+        );
+        assert_eq!(header.bit_depth, 16, "wrong bit depth");
+
+        header
     }
 }
 
 impl BlockChunk {
-    fn parse(file: &mut File, num_channels: u16) -> Self {
-        let header = BlockChunkHeader::parse(file);
+    fn parse(reader: &mut Reader, num_channels: u16) -> Self {
+        let header = BlockChunkHeader::parse(reader);
         let blocks = (0..num_channels)
-            .map(|_| Block::parse(file, header.num_samples()))
+            .map(|_| Block::parse(reader, header.num_samples()))
             .collect();
 
         BlockChunk { header, blocks }
@@ -83,25 +82,30 @@ impl BlockChunk {
 }
 
 impl Parsable for BlockChunkHeader {
-    fn parse(file: &mut File) -> Self {
-        let mut bytes = [0; size_of::<Self>()];
-        file.read_or_pad(&mut bytes);
+    fn parse(reader: &mut Reader) -> Self {
+        let header: Self = reader.deserialize(&mut [0; 32]);
 
-        deserialize::<Self>(&bytes).verify()
+        assert_eq!(
+            &header.magic,
+            BlockChunkHeader::MAGIC,
+            "wrong block chunk magic"
+        );
+
+        header
     }
 }
 
 impl Block {
-    fn parse(file: &mut File, num_samples: u32) -> Self {
-        Block((0..num_samples).map(|_| Sample::parse(file)).collect())
-    }
-}
+    fn parse(reader: &mut Reader, num_samples: u32) -> Self {
+        Block {
+            samples: (0..num_samples)
+                .map(|_| {
+                    let mut bytes = [0; 2];
+                    reader.read(&mut bytes).unwrap_or_default();
 
-impl Parsable for Sample {
-    fn parse(file: &mut File) -> Self {
-        let mut bytes = [0; size_of::<Self>()];
-        file.read_or_pad(&mut bytes);
-
-        Sample(i16::from_be_bytes(bytes))
+                    i16::from_be_bytes(bytes)
+                })
+                .collect(),
+        }
     }
 }

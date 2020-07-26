@@ -6,7 +6,6 @@ pub struct AstFile {
     pub block_chunks: Vec<BlockChunk>,
 }
 
-/// todo deserialize using our own thing and from_be_bytes because i think serde is slow here
 #[derive(Deserialize, Debug)]
 pub struct AstHeader {
     pub magic: [u8; 4],
@@ -20,7 +19,7 @@ pub struct AstHeader {
     pub loop_start: u32,
     pub loop_end: u32,
     pub first_block_size: u32,
-    __unknown2: [u8; 0x1C],
+    __unknown2: [u8; 28],
 }
 
 impl AstHeader {
@@ -44,7 +43,7 @@ pub struct BlockChunk {
 pub struct BlockChunkHeader {
     pub magic: [u8; 4],
     pub block_size: u32,
-    __padding: [u8; 0x18],
+    __padding: [u8; 24],
 }
 
 impl BlockChunkHeader {
@@ -56,7 +55,6 @@ impl BlockChunkHeader {
 }
 
 #[derive(Debug)]
-pub struct Block(pub Vec<Sample>);
-
-#[derive(Debug)]
-pub struct Sample(pub i16);
+pub struct Block {
+    pub samples: Vec<i16>,
+}

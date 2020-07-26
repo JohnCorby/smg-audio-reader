@@ -1,5 +1,7 @@
-use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
+
+use bincode::{options, Options};
+use serde::Deserialize;
 
 pub trait FileExt: Seek + Read {
     fn print_pos(&mut self) {
@@ -24,9 +26,16 @@ pub trait FileExt: Seek + Read {
         }
     }
 
-    fn read_or_pad(&mut self, buf: &mut [u8]) {
-        self.read(buf).unwrap_or_default();
+    fn deserialize<'a, T: Deserialize<'a>>(&mut self, bytes: &'a mut [u8]) -> T {
+        self.read(bytes).unwrap_or_default();
+
+        options()
+            .with_big_endian()
+            .with_fixint_encoding()
+            .allow_trailing_bytes()
+            .deserialize(bytes)
+            .expect("error deserializing bytes")
     }
 }
 
-impl FileExt for File {}
+impl<T: Seek + Read> FileExt for T {}

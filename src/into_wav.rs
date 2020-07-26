@@ -27,13 +27,13 @@ impl AstFile {
             for sample_index in 0..block_chunk.header.num_samples() {
                 for block in &block_chunk.blocks {
                     writer
-                        .write_sample(block.0[sample_index as usize].0)
+                        .write_sample(block.samples[sample_index as usize])
                         .expect("error writing wav sample");
                 }
             }
         }
 
         // save to file
-        writer.finalize().expect("error finalizing wav file");
+        writer.finalize().expect("error finalizing wav file")
     }
 }
