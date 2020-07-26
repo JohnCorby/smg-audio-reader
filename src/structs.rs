@@ -47,8 +47,8 @@ pub struct AstHeader {
     __unknown1: u16,
     pub sample_rate: u32,
     /// fixme not accurate?
-    pub loop_start: u32,
     pub total_num_samples: u32,
+    pub loop_start: u32,
     pub loop_end: u32,
     pub first_block_size: u32,
     __unknown2: [u8; 28],
