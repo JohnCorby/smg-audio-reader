@@ -1,7 +1,8 @@
+use crate::structs::AstFile;
+use rayon::prelude::*;
 use std::env::args;
 use std::path::Path;
-
-use crate::structs::AstFile;
+use std::time::Instant;
 
 mod ext;
 mod into_wav;
@@ -9,7 +10,7 @@ mod parse;
 mod structs;
 
 /// see https://wiibrew.org/wiki/AST_file
-/// and http://wiki.tockdom.com/wiki/AST_(File_Format)#BLCK
+/// and http://wiki.tockdom.com/wiki/AST_(File_Format)
 fn main() {
     let path = args().nth(1).expect("path not provided");
     let path = Path::new(&path);
@@ -25,10 +26,16 @@ fn convert_all(path: &Path) {
     assert!(path.is_dir(), "convert all path is not dir");
 
     println!("converting all ast files in {:?}", path);
-    for entry in path.read_dir().expect("error reading dir") {
-        let path = entry.expect("error getting dir entry").path();
-        if path.extension().unwrap_or_default() == "ast" {
-            convert_one(&path);
-        }
-    }
+    let now = Instant::now();
+
+    let paths = path
+        .read_dir()
+        .expect("error reading dir")
+        .map(|entry| entry.expect("error getting dir entry").path())
+        .filter(|path| path.extension().unwrap_or_default() == "ast")
+        .collect::<Vec<_>>();
+
+    paths.par_iter().for_each(|path| convert_one(path));
+
+    println!("parsing all files in {:?} took {:?}", path, now.elapsed());
 }
