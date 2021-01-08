@@ -1,8 +1,18 @@
+use crate::structs::*;
+use bincode::config::*;
 use std::fs::File;
 use std::io::{BufReader, Read};
+use std::ops::Deref;
 
-use crate::ext::FileExt;
-use crate::structs::{AstFile, AstHeader, AudioFormat, Block, BlockChunk, BlockChunkHeader};
+fn options() -> WithOtherTrailing<
+    WithOtherIntEncoding<WithOtherEndian<DefaultOptions, BigEndian>, FixintEncoding>,
+    AllowTrailing,
+> {
+    DefaultOptions::new()
+        .with_big_endian()
+        .with_fixint_encoding()
+        .allow_trailing_bytes()
+}
 
 type Reader = BufReader<File>;
 
@@ -11,8 +21,8 @@ impl AstFile {
         let header = AstHeader::parse(reader);
 
         let mut block_chunks = vec![];
-        while !reader.at_eof() {
-            block_chunks.push(BlockChunk::parse(reader, header.num_channels));
+        while let Some(block_chunk) = BlockChunk::parse(reader, header.num_channels) {
+            block_chunks.push(block_chunk);
         }
 
         AstFile {
@@ -24,12 +34,14 @@ impl AstFile {
 
 impl AstHeader {
     fn parse(reader: &mut Reader) -> Self {
-        let header: Self = reader.deserialize(&mut [0; 64]);
+        let header: Self = options()
+            .deserialize_from(reader)
+            .expect("error deserializing ast header");
 
         assert_eq!(&header.magic, Self::MAGIC, "wrong ast magic");
         assert_eq!(
             header.audio_format,
-            AudioFormat::PCM16 as u16,
+            AudioFormat::PCM16,
             "wrong audio format"
         );
         assert_eq!(header.bit_depth, 16, "wrong bit depth");
@@ -39,23 +51,32 @@ impl AstHeader {
 }
 
 impl BlockChunk {
-    fn parse(reader: &mut Reader, num_channels: u16) -> Self {
-        let header = BlockChunkHeader::parse(reader);
+    fn parse(reader: &mut Reader, num_channels: u16) -> Option<Self> {
+        let header = BlockChunkHeader::parse(reader)?;
         let blocks = (0..num_channels)
             .map(|_| Block::parse(reader, header.num_samples()))
             .collect();
 
-        BlockChunk { header, blocks }
+        Some(BlockChunk { header, blocks })
     }
 }
 
 impl BlockChunkHeader {
-    fn parse(reader: &mut Reader) -> Self {
-        let header: Self = reader.deserialize(&mut [0; 32]);
+    fn parse(reader: &mut Reader) -> Option<Self> {
+        let header: bincode::Result<Self> = options().deserialize_from(reader);
+        // return none if eof
+        if let Err(ref error) = header {
+            if let bincode::ErrorKind::Io(error) = error.deref() {
+                if let std::io::ErrorKind::UnexpectedEof = error.kind() {
+                    return None;
+                }
+            }
+        }
+        let header = header.expect("error deserializing block chunk header");
 
         assert_eq!(&header.magic, Self::MAGIC, "wrong block chunk magic");
 
-        header
+        Some(header)
     }
 }
 

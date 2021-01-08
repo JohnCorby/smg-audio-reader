@@ -1,10 +1,10 @@
+use serde::Deserialize;
+use serde_repr::Deserialize_repr;
 use std::fs::File;
 use std::io::BufReader;
 use std::mem::size_of;
 use std::path::Path;
 use std::time::Instant;
-
-use serde::Deserialize;
 
 #[derive(Debug)]
 pub struct AstFile {
@@ -28,12 +28,13 @@ impl AstFile {
             "path must be ast file"
         );
 
+        let file = File::open(path).expect("error opening file");
+        let mut reader = BufReader::new(file);
+
         let now = Instant::now();
-        let file = Self::parse(&mut BufReader::new(
-            File::open(path).expect("error opening file"),
-        ));
+        let ret = Self::parse(&mut reader);
         println!("parsing {:?} took {:?}", path, now.elapsed());
-        file
+        ret
     }
 }
 
@@ -41,7 +42,7 @@ impl AstFile {
 pub struct AstHeader {
     pub magic: [u8; 4],
     pub total_channel_size: u32,
-    pub audio_format: u16,
+    pub audio_format: AudioFormat,
     pub bit_depth: u16,
     pub num_channels: u16,
     __unknown1: u16,
@@ -58,9 +59,8 @@ impl AstHeader {
     pub const MAGIC: &'static [u8; 4] = b"STRM";
 }
 
-#[derive(Debug)]
+#[derive(Deserialize_repr, Debug, PartialEq)]
 #[repr(u16)]
-#[allow(dead_code)]
 pub enum AudioFormat {
     ADPCM,
     PCM16,
@@ -83,7 +83,7 @@ impl BlockChunkHeader {
     pub const MAGIC: &'static [u8; 4] = b"BLCK";
 
     pub fn num_samples(&self) -> u32 {
-        self.block_size / 2
+        self.block_size / size_of::<i16>() as u32
     }
 }
 

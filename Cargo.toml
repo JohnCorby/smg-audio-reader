@@ -1,13 +1,15 @@
 [package]
 name = "smg-audio-reader"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["JohnCorby <williamforgames6@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde = { version = "1.0.117", features = ["derive"] }
+serde = { version = "1.0.118", features = ["derive"] }
+serde_repr = "0.1.6"
 bincode = "1.3.1"
 hound = "3.4.0"
 rayon = "1.5.0"
+walkdir = "2.3.1"
