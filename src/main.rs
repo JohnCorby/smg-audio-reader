@@ -26,6 +26,9 @@ fn convert_all(path: &Path) {
         .filter(|path| path.extension().unwrap_or_default() == "ast")
         .collect::<Vec<_>>();
 
-    rayon::ThreadPoolBuilder::new().thread_name(|i| format!("rayon thread {}", i));
+    rayon::ThreadPoolBuilder::new()
+        .thread_name(|i| format!("rayon thread {}", i))
+        .build_global()
+        .expect("error building ray global thread pool");
     paths.par_iter().for_each(|path| convert(path));
 }
